@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="description" content="PostureIQ - Personal Posture & Activity Monitor using device accelerometer">
+  <meta name="theme-color" content="#0a0e1a">
+  <title>PostureIQ — Personal Activity Monitor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="alertBanner" class="alert-banner" role="alert" aria-live="polite" aria-atomic="true">
+  ⚠️ Slouch detected for 60s — Fix your posture!
+</div>
+
+<div class="app">
+  <div class="header">
+    <div class="logo">Posture<span>IQ</span></div>
+    <div id="statusDot" class="status-dot" title="Monitoring status"></div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button 
+      class="tab active" 
+      role="tab" 
+      aria-selected="true" 
+      aria-controls="monitor"
+      onclick="showTab('monitor', this)">
+      📡 Live
+    </button>
+    <button 
+      class="tab" 
+      role="tab" 
+      aria-selected="false" 
+      aria-controls="analytics"
+      onclick="showTab('analytics', this)">
+      📊 Analytics
+    </button>
+    <button 
+      class="tab" 
+      role="tab" 
+      aria-selected="false" 
+      aria-controls="history"
+      onclick="showTab('history', this)">
+      📋 History
+    </button>
+    <button 
+      class="tab" 
+      role="tab" 
+      aria-selected="false" 
+      aria-controls="settings"
+      onclick="showTab('settings', this)">
+      ⚙️ Settings
+    </button>
+  </div>
+
+  <!-- LIVE MONITOR TAB -->
+  <div id="monitor" class="section active" role="tabpanel" aria-labelledby="tab-monitor">
+    <div id="permCard" class="permission-card">
+      <div class="perm-icon">📱</div>
+      <div class="perm-title">Enable Motion Sensors</div>
+      <div class="perm-desc">PostureIQ uses your device's accelerometer and gyroscope to classify posture and activity in real-time — completely on-device, no data ever sent anywhere.</div>
+      <button class="btn-primary" onclick="AppController.requestPermission()" aria-label="Start monitoring posture">
+        Start Monitoring
+      </button>
+      <p class="note">Works best on mobile. On desktop, simulated data will be used for demo.</p>
+    </div>
+
+    <div id="monitorContent" style="display:none" aria-live="polite">
+      <!-- Loading state -->
+      <div id="loadingState" class="loading-overlay" style="display:none">
+        <div class="spinner"></div>
+        <p>Calibrating sensors...</p>
+      </div>
+
+      <div class="posture-gauge" id="postureGauge">
+        <div class="posture-label">Current State</div>
+        <span class="posture-icon" id="postureIcon" role="img" aria-label="posture indicator">🧍</span>
+        <div class="posture-state" id="postureState" style="color:var(--teal)">Calibrating...</div>
+        <div class="posture-confidence" id="postureConf">Confidence: —</div>
+      </div>
+
+      <div class="sensor-row">
+        <div class="sensor-card">
+          <div class="sensor-axis ax" id="axVal">0.0</div>
+          <div class="sensor-label">Accel X</div>
+        </div>
+        <div class="sensor-card">
+          <div class="sensor-axis ay" id="ayVal">0.0</div>
+          <div class="sensor-label">Accel Y</div>
+        </div>
+        <div class="sensor-card">
+          <div class="sensor-axis az" id="azVal">0.0</div>
+          <div class="sensor-label">Accel Z</div>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <div class="chart-title">Accelerometer Signal (last 5s)</div>
+        <canvas id="signalChart" height="80" aria-label="Accelerometer signal over time"></canvas>
+      </div>
+
+      <div class="feed-title">Activity Log</div>
+      <div class="feed-list" id="feedList" role="log">
+        <div class="feed-item">
+          <div class="feed-dot" style="background:var(--teal)"></div>
+          <div class="feed-text">Monitoring started</div>
+          <div class="feed-time">now</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ANALYTICS TAB -->
+  <div id="analytics" class="section" role="tabpanel" aria-labelledby="tab-analytics">
+    <div class="section-title">Today's Summary</div>
+
+    <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:20px; text-align:center; margin-bottom:12px;">
+      <div style="font-size:13px; color:var(--text-muted); margin-bottom:12px; text-transform:uppercase; letter-spacing:1px;">Posture Score</div>
+      <div class="score-circle" id="scoreCircle">
+        <svg viewBox="0 0 108 108" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="54" cy="54" r="46" stroke="var(--border)" stroke-width="8"/>
+          <circle id="scoreArc" cx="54" cy="54" r="46" stroke="var(--teal)" stroke-width="8"
+            stroke-linecap="round" stroke-dasharray="289" stroke-dashoffset="289"/>
+        </svg>
+        <div class="score-num" id="scoreNum" role="status">0</div>
+        <div class="score-text">/ 100</div>
+      </div>
+      <div style="font-size:13px; color:var(--text-dim);" id="scoreLabel">Start monitoring to see your score</div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--green)" id="goodTime">0m</div>
+        <div class="stat-label">Good Posture</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--amber)" id="slouchTime">0m</div>
+        <div class="stat-label">Slouching</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--blue)" id="walkTime">0m</div>
+        <div class="stat-label">Walking</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--text-dim)" id="standTime">0m</div>
+        <div class="stat-label">Standing</div>
+      </div>
+    </div>
+
+    <div class="timeline-bar">
+      <div class="timeline-label">Posture Timeline (session)</div>
+      <div class="bar-track" id="timelineBar">
+        <div class="bar-seg" id="barGood" style="background:var(--green); width:0%"></div>
+        <div class="bar-seg" id="barSlouch" style="background:var(--amber); width:0%"></div>
+        <div class="bar-seg" id="barWalk" style="background:var(--blue); width:0%"></div>
+        <div class="bar-seg" id="barStand" style="background:var(--text-muted); width:0%"></div>
+      </div>
+      <div class="bar-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Good</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div>Slouch</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Walk</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--text-muted)"></div>Stand</div>
+      </div>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-title">Activity Distribution</div>
+      <div class="donut-wrap">
+        <canvas id="donutChart" width="140" height="140" aria-label="Activity distribution pie chart"></canvas>
+        <div class="donut-center">
+          <span id="topActivity" role="status">—</span>
+          <small id="topActivityLabel">top activity</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-wrap" style="margin-top:12px">
+      <div class="chart-title">Signal Magnitude (SMA) History</div>
+      <canvas id="smaChart" height="90" aria-label="Signal magnitude over time"></canvas>
+    </div>
+  </div>
+
+  <!-- HISTORY TAB -->
+  <div id="history" class="section" role="tabpanel" aria-labelledby="tab-history">
+    <div class="section-title">Session History</div>
+    <div id="historyList">
+      <div style="text-align:center; color:var(--text-muted); padding:40px 0; font-size:14px;">
+        No sessions yet.<br>Start monitoring to record data.
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div id="settings" class="section" role="tabpanel" aria-labelledby="tab-settings">
+    <div class="section-title">Alert Settings</div>
+
+    <div class="setting-card">
+      <div class="setting-info">
+        <h4>Slouch Alerts</h4>
+        <p>Vibrate when poor posture detected for 60s <span class="grace-badge">60s grace</span></p>
+      </div>
+      <div 
+        class="toggle on" 
+        id="togAlert" 
+        role="switch"
+        aria-checked="true"
+        aria-label="Slouch alerts"
+        tabindex="0"
+        onclick="AppController.toggleSetting('togAlert', 'alertEnabled')"
+        onkeydown="AppController.handleToggleKeydown(event, 'togAlert', 'alertEnabled')">
+      </div>
+    </div>
+
+    <div class="setting-card">
+      <div class="setting-info">
+        <h4>Sitting Reminders</h4>
+        <p>Alert if sitting still for more than 30 minutes</p>
+      </div>
+      <div 
+        class="toggle on" 
+        id="togSit" 
+        role="switch"
+        aria-checked="true"
+        aria-label="Sitting reminders"
+        tabindex="0"
+        onclick="AppController.toggleSetting('togSit', 'sitReminder')"
+        onkeydown="AppController.handleToggleKeydown(event, 'togSit', 'sitReminder')">
+      </div>
+    </div>
+
+    <div class="setting-card">
+      <div class="setting-info">
+        <h4>Sound Alerts</h4>
+        <p>Play a soft beep alongside vibration</p>
+      </div>
+      <div 
+        class="toggle" 
+        id="togSound" 
+        role="switch"
+        aria-checked="false"
+        aria-label="Sound alerts"
+        tabindex="0"
+        onclick="AppController.toggleSetting('togSound', 'soundEnabled')"
+        onkeydown="AppController.handleToggleKeydown(event, 'togSound', 'soundEnabled')">
+      </div>
+    </div>
+
+    <div class="setting-card">
+      <div class="setting-info">
+        <h4>Dark Mode</h4>
+        <p>Use system preference or manually toggle</p>
+      </div>
+      <div 
+        class="toggle" 
+        id="togDarkMode" 
+        role="switch"
+        aria-checked="true"
+        aria-label="Dark mode"
+        tabindex="0"
+        onclick="AppController.toggleDarkMode()"
+        onkeydown="AppController.handleToggleKeydown(event, 'togDarkMode', 'darkMode')">
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-title" style="font-size:15px">Detection Info</div>
+
+    <div class="setting-card" style="flex-direction:column; align-items:flex-start; gap:12px">
+      <div style="width:100%">
+        <div style="font-size:13px; font-weight:600; margin-bottom:6px">Algorithm</div>
+        <div style="font-size:12px; color:var(--text-muted); line-height:1.7">
+          <b style="color:var(--teal)">Butterworth Low-pass Filter</b> (20Hz cutoff) removes sensor jitter.<br>
+          <b style="color:var(--teal)">Sliding Window</b> (2.56s, 50% overlap) captures temporal patterns.<br>
+          <b style="color:var(--teal)">SMA + Gravity Vector</b> separation identifies tilt vs. movement.<br>
+          <b style="color:var(--teal)">Rule-based Classifier</b> maps feature vectors to activity states.
+        </div>
+      </div>
+    </div>
+
+    <div class="setting-card" style="flex-direction:column; align-items:flex-start; gap:12px">
+      <div style="width:100%">
+        <div style="font-size:13px; font-weight:600; margin-bottom:8px">Sensor Calibration</div>
+        <button 
+          class="btn-primary" 
+          onclick="AppController.recalibrate()" 
+          style="font-size:13px; padding:10px 20px"
+          aria-label="Recalibrate sensor baseline">
+          Recalibrate Baseline
+        </button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div style="text-align:center; color:var(--text-muted); font-size:12px; line-height:1.8; padding: 8px 0 20px;">
+      PostureIQ v2.0 — Jituraj Kalita<br>
+      Dept. of Computer Science, Gauhati University<br>
+      All processing is on-device. No data is collected.
+    </div>
+  </div>
+</div>
+
+<script src="js/classifier.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/sensors.js"></script>
+<script src="js/analytics.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
