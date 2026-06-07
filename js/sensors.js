@@ -31,9 +31,20 @@ const SensorManager = (() => {
             }
           })
           .catch(reject);
+      } else if (typeof DeviceMotionEvent !== 'undefined') {
+        // Android - no permission required, but HTTPS is needed
+        // Check if running on HTTPS or localhost
+        const isSecure = window.location.protocol === 'https:' || window.location.hostname === 'localhost';
+        if (!isSecure) {
+          console.warn('⚠️ HTTPS required for sensors on Android. Using simulated data.');
+          resolve(false); // Signal to use simulation
+        } else {
+          resolve(true);
+        }
       } else {
-        // Android or older iOS
-        resolve(true);
+        // No DeviceMotionEvent support
+        console.warn('Device motion not supported');
+        resolve(false);
       }
     });
   }
@@ -50,8 +61,9 @@ const SensorManager = (() => {
     window.addEventListener('devicemotion', handleDeviceMotion, true);
     isListening = true;
 
-    // Fallback: simulate data on desktop
+    // Fallback: simulate data on desktop or if sensor access fails
     if (!isDeviceMotionSupported()) {
+      console.log('Device motion not supported, using simulated data');
       simulateSensorData();
     }
   }
@@ -70,10 +82,7 @@ const SensorManager = (() => {
    * Check if device supports motion events
    */
   function isDeviceMotionSupported() {
-    return (
-      typeof window.DeviceMotionEvent !== 'undefined' &&
-      typeof window.DeviceMotionEvent.requestPermission !== 'function'
-    );
+    return typeof window.DeviceMotionEvent !== 'undefined';
   }
 
   /**
@@ -82,8 +91,10 @@ const SensorManager = (() => {
   function handleDeviceMotion(event) {
     try {
       const acc = event.acceleration;
-      if (!acc || typeof acc.x === 'undefined') {
-        console.warn('Acceleration data unavailable');
+      if (!acc || (typeof acc.x === 'undefined' && typeof acc.y === 'undefined' && typeof acc.z === 'undefined')) {
+        // Fallback to simulation if no real data
+        if (!isListening) return;
+        simulateSensorData();
         return;
       }
 
