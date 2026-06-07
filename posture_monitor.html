@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>PostureIQ — Personal Activity Monitor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2234;
+    --border: #1e2d47;
+    --teal: #00d4b8;
+    --teal-dim: #00d4b820;
+    --amber: #fbbf24;
+    --amber-dim: #fbbf2420;
+    --red: #f87171;
+    --red-dim: #f8717120;
+    --green: #4ade80;
+    --green-dim: #4ade8020;
+    --blue: #60a5fa;
+    --text: #e2e8f0;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 600px 400px at 20% 10%, #00d4b808 0%, transparent 70%),
+      radial-gradient(ellipse 500px 300px at 80% 80%, #60a5fa06 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; padding: 0 0 80px; }
+
+  /* Header */
+  .header {
+    padding: 24px 20px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--teal);
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--text-muted); font-weight: 400; }
+  .status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: all 0.3s;
+    box-shadow: 0 0 0 0 transparent;
+  }
+  .status-dot.active {
+    background: var(--green);
+    animation: pulse-dot 2s infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { box-shadow: 0 0 0 0 #4ade8040; }
+    50% { box-shadow: 0 0 0 6px transparent; }
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    padding: 16px 20px 0;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    flex: 1;
+    padding: 10px 4px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+
+  /* Sections */
+  .section { display: none; padding: 20px; }
+  .section.active { display: block; }
+
+  /* Permission screen */
+  .permission-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px 24px;
+    text-align: center;
+    margin-top: 20px;
+  }
+  .perm-icon {
+    width: 72px; height: 72px;
+    background: var(--teal-dim);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 20px;
+    font-size: 32px;
+  }
+  .perm-title { font-size: 22px; font-weight: 600; margin-bottom: 10px; }
+  .perm-desc { color: var(--text-dim); font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
+  .btn-primary {
+    display: inline-block;
+    background: var(--teal);
+    color: #0a0e1a;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 14px 32px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px #00d4b830; }
+  .btn-primary:active { transform: translateY(0); }
+
+  /* Live Monitor */
+  .posture-gauge {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 28px 24px;
+    text-align: center;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .posture-gauge::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 0%, var(--state-color, #00d4b810) 0%, transparent 60%);
+    transition: background 1s;
+    pointer-events: none;
+  }
+  .posture-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+  .posture-state {
+    font-size: 40px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    transition: color 0.5s;
+  }
+  .posture-confidence {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+  }
+  .posture-icon {
+    font-size: 64px;
+    margin-bottom: 4px;
+    display: block;
+    transition: all 0.5s;
+  }
+
+  /* Score arc */
+  .score-ring {
+    width: 120px; height: 60px;
+    position: relative;
+    margin: 0 auto 8px;
+  }
+  .score-ring svg { width: 120px; height: 120px; margin-top: -60px; }
+
+  /* Sensor cards */
+  .sensor-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .sensor-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 12px;
+    text-align: center;
+  }
+  .sensor-axis {
+    font-family: 'Space Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .sensor-label { font-size: 11px; color: var(--text-muted); }
+  .ax { color: var(--red); }
+  .ay { color: var(--green); }
+  .az { color: var(--blue); }
+
+  /* Activity feed */
+  .feed-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .feed-list { display: flex; flex-direction: column; gap: 8px; }
+  .feed-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .feed-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .feed-text { flex: 1; font-size: 13px; color: var(--text-dim); }
+  .feed-time { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--text-muted); }
+
+  /* Stats grid */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 16px;
+  }
+  .stat-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .stat-unit { font-size: 13px; color: var(--text-muted); }
+  .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+  /* Posture timeline bar */
+  .timeline-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 16px;
+    margin-bottom: 12px;
+  }
+  .timeline-label { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+  .bar-track {
+    height: 28px;
+    border-radius: 8px;
+    background: var(--surface2);
+    overflow: hidden;
+    display: flex;
+  }
+  .bar-seg { height: 100%; transition: width 0.5s ease; }
+  .bar-legend { display: flex; gap: 16px; margin-top: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+  /* Alert settings */
+  .setting-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .setting-info h4 { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+  .setting-info p { font-size: 12px; color: var(--text-muted); }
+  .toggle {
+    width: 46px; height: 26px;
+    background: var(--surface2);
+    border-radius: 13px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.3s;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .toggle.on { background: var(--teal); border-color: var(--teal); }
+  .toggle::after {
+    content: '';
+    width: 20px; height: 20px;
+    background: white;
+    border-radius: 50%;
+    position: absolute;
+    top: 2px; left: 2px;
+    transition: transform 0.3s;
+  }
+  .toggle.on::after { transform: translateX(20px); }
+
+  /* Bottom nav */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: #0d1422ee;
+    backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border);
+    display: flex;
+    padding: 10px 0 16px;
+    max-width: 480px;
+    margin: 0 auto;
+    z-index: 100;
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 0;
+    transition: color 0.2s;
+  }
+  .nav-item.active { color: var(--teal); }
+  .nav-icon { font-size: 20px; line-height: 1; }
+
+  /* Chart canvas */
+  .chart-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .chart-title { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+  canvas { width: 100% !important; }
+
+  /* Alert banner */
+  .alert-banner {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    background: var(--amber);
+    color: #0a0e1a;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 14px 20px;
+    text-align: center;
+    transform: translateY(-100%);
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 999;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .alert-banner.show { transform: translateY(0); }
+
+  /* Score circle */
+  .score-circle {
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    border: 4px solid var(--border);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+    position: relative;
+  }
+  .score-circle svg {
+    position: absolute; inset: -4px;
+    width: calc(100% + 8px);
+    height: calc(100% + 8px);
+    transform: rotate(-90deg);
+  }
+  .score-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 26px;
+    font-weight: 700;
+    position: relative;
+    z-index: 1;
+  }
+  .score-text { font-size: 11px; color: var(--text-muted); position: relative; z-index: 1; }
+
+  /* Activity breakdown donut */
+  .donut-wrap { position: relative; width: 140px; height: 140px; margin: 0 auto; }
+  .donut-wrap canvas { position: absolute; inset: 0; }
+  .donut-center {
+    position: absolute;
+    inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  .donut-center span { font-family: 'Space Mono', monospace; font-size: 22px; font-weight: 700; }
+  .donut-center small { font-size: 11px; color: var(--text-muted); }
+
+  /* Permission note */
+  .note {
+    font-size: 12px; color: var(--text-muted);
+    text-align: center; padding: 16px 0;
+    line-height: 1.6;
+  }
+
+  .section-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+  .grace-badge {
+    display: inline-block;
+    background: var(--amber-dim);
+    color: var(--amber);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 20px;
+    border: 1px solid var(--amber);
+  }
+</style>
+</head>
+<body>
+
+<div id="alertBanner" class="alert-banner">⚠️ Slouch detected for 60s — Fix your posture!</div>
+
+<div class="app">
+  <div class="header">
+    <div class="logo">Posture<span>IQ</span></div>
+    <div id="statusDot" class="status-dot"></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('monitor', this)">📡 Live</button>
+    <button class="tab" onclick="showTab('analytics', this)">📊 Analytics</button>
+    <button class="tab" onclick="showTab('history', this)">📋 History</button>
+    <button class="tab" onclick="showTab('settings', this)">⚙️ Settings</button>
+  </div>
+
+  <!-- LIVE MONITOR TAB -->
+  <div id="monitor" class="section active">
+    <div id="permCard" class="permission-card">
+      <div class="perm-icon">📱</div>
+      <div class="perm-title">Enable Motion Sensors</div>
+      <div class="perm-desc">PostureIQ uses your device's accelerometer and gyroscope to classify posture and activity in real-time — completely on-device, no data ever sent anywhere.</div>
+      <button class="btn-primary" onclick="requestPermission()">Start Monitoring</button>
+      <p class="note">Works best on mobile. On desktop, simulated data will be used for demo.</p>
+    </div>
+
+    <div id="monitorContent" style="display:none">
+      <div class="posture-gauge" id="postureGauge">
+        <div class="posture-label">Current State</div>
+        <span class="posture-icon" id="postureIcon">🧍</span>
+        <div class="posture-state" id="postureState" style="color:var(--teal)">Calibrating...</div>
+        <div class="posture-confidence" id="postureConf">Confidence: —</div>
+      </div>
+
+      <div class="sensor-row">
+        <div class="sensor-card">
+          <div class="sensor-axis ax" id="axVal">0.0</div>
+          <div class="sensor-label">Accel X</div>
+        </div>
+        <div class="sensor-card">
+          <div class="sensor-axis ay" id="ayVal">0.0</div>
+          <div class="sensor-label">Accel Y</div>
+        </div>
+        <div class="sensor-card">
+          <div class="sensor-axis az" id="azVal">0.0</div>
+          <div class="sensor-label">Accel Z</div>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <div class="chart-title">Accelerometer Signal (last 5s)</div>
+        <canvas id="signalChart" height="80"></canvas>
+      </div>
+
+      <div class="feed-title">Activity Log</div>
+      <div class="feed-list" id="feedList">
+        <div class="feed-item">
+          <div class="feed-dot" style="background:var(--teal)"></div>
+          <div class="feed-text">Monitoring started</div>
+          <div class="feed-time">now</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ANALYTICS TAB -->
+  <div id="analytics" class="section">
+    <div class="section-title">Today's Summary</div>
+
+    <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:20px; text-align:center; margin-bottom:12px;">
+      <div style="font-size:13px; color:var(--text-muted); margin-bottom:12px; text-transform:uppercase; letter-spacing:1px;">Posture Score</div>
+      <div class="score-circle" id="scoreCircle">
+        <svg viewBox="0 0 108 108" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="54" cy="54" r="46" stroke="var(--border)" stroke-width="8"/>
+          <circle id="scoreArc" cx="54" cy="54" r="46" stroke="var(--teal)" stroke-width="8"
+            stroke-linecap="round" stroke-dasharray="289" stroke-dashoffset="289"/>
+        </svg>
+        <div class="score-num" id="scoreNum">0</div>
+        <div class="score-text">/ 100</div>
+      </div>
+      <div style="font-size:13px; color:var(--text-dim);" id="scoreLabel">Start monitoring to see your score</div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--green)" id="goodTime">0m</div>
+        <div class="stat-label">Good Posture</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--amber)" id="slouchTime">0m</div>
+        <div class="stat-label">Slouching</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--blue)" id="walkTime">0m</div>
+        <div class="stat-label">Walking</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--text-dim)" id="standTime">0m</div>
+        <div class="stat-label">Standing</div>
+      </div>
+    </div>
+
+    <div class="timeline-bar">
+      <div class="timeline-label">Posture Timeline (session)</div>
+      <div class="bar-track" id="timelineBar">
+        <div class="bar-seg" id="barGood" style="background:var(--green); width:0%"></div>
+        <div class="bar-seg" id="barSlouch" style="background:var(--amber); width:0%"></div>
+        <div class="bar-seg" id="barWalk" style="background:var(--blue); width:0%"></div>
+        <div class="bar-seg" id="barStand" style="background:var(--text-muted); width:0%"></div>
+      </div>
+      <div class="bar-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Good</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div>Slouch</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Walk</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--text-muted)"></div>Stand</div>
+      </div>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-title">Activity Distribution</div>
+      <div class="donut-wrap">
+        <canvas id="donutChart" width="140" height="140"></canvas>
+        <div class="donut-center">
+          <span id="topActivity">—</span>
+          <small id="topActivityLabel">top activity</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-wrap" style="margin-top:12px">
+      <div class="chart-title">Signal Magnitude (SMA) History</div>
+      <canvas id="smaChart" height="90"></canvas>
+    </div>
+  </div>
+
+  <!-- HISTORY TAB -->
+  <div id="history" class="section">
+    <div class="section-title">Session History</div>
+    <div id="historyList">
+      <div style="text-align:center; color:var(--text-muted); padding:40px 0; font-size:14px;">
+        No sessions yet.<br>Start monitoring to record data.
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div id="settings" class="section">
+    <div class="section-title">Alert Settings</div>
+
+    <div class="setting-card">
+      <div class="setting-info">
+        <h4>Slouch Alerts</h4>
+        <p>Vibrate when poor posture detected for 60s <span class="grace-badge">60s grace</span></p>
+      </div>
+      <div class="toggle on" id="togAlert" onclick="toggleSetting('togAlert', 'alertEnabled')"></div>
+    </div>
+
+    <div class="setting-card">
+      <div class="setting-info">
+        <h4>Sitting Reminders</h4>
+        <p>Alert if sitting still for more than 30 minutes</p>
+      </div>
+      <div class="toggle on" id="togSit" onclick="toggleSetting('togSit', 'sitReminder')"></div>
+    </div>
+
+    <div class="setting-card">
+      <div class="setting-info">
+        <h4>Sound Alerts</h4>
+        <p>Play a soft beep alongside vibration</p>
+      </div>
+      <div class="toggle" id="togSound" onclick="toggleSetting('togSound', 'soundEnabled')"></div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-title" style="font-size:15px">Detection Info</div>
+
+    <div class="setting-card" style="flex-direction:column; align-items:flex-start; gap:12px">
+      <div style="width:100%">
+        <div style="font-size:13px; font-weight:600; margin-bottom:6px">Algorithm</div>
+        <div style="font-size:12px; color:var(--text-muted); line-height:1.7">
+          <b style="color:var(--teal)">Butterworth Low-pass Filter</b> (20Hz cutoff) removes sensor jitter.<br>
+          <b style="color:var(--teal)">Sliding Window</b> (2.56s, 50% overlap) captures temporal patterns.<br>
+          <b style="color:var(--teal)">SMA + Gravity Vector</b> separation identifies tilt vs. movement.<br>
+          <b style="color:var(--teal)">Rule-based Classifier</b> maps feature vectors to activity states.
+        </div>
+      </div>
+    </div>
+
+    <div class="setting-card" style="flex-direction:column; align-items:flex-start; gap:12px">
+      <div style="width:100%">
+        <div style="font-size:13px; font-weight:600; margin-bottom:8px">Sensor Calibration</div>
+        <button class="btn-primary" onclick="recalibrate()" style="font-size:13px; padding:10px 20px">
+          Recalibrate Baseline
+        </button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div style="text-align:center; color:var(--text-muted); font-size:12px; line-height:1.8; padding: 8px 0 20px;">
+      PostureIQ v1.0 — Jituraj Kalita<br>
+      Dept. of Computer Science, Gauhati University<br>
+      All processing is on-device. No data is collected.
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   PostureIQ — Personal Posture & Activity Monitor
+   Jituraj Kalita | CS Dept, Gauhati University
+   ========================================================= */
+
+// ── State ─────────────────────────────────────────────────
+const state = {
+  monitoring: false,
+  alertEnabled: true,
+  sitReminder: true,
+  soundEnabled: false,
+  lastX: 0, lastY: 0, lastZ: 0,
+  baseline: { x: 0, y: 0, z: 9.8 },
+  calibrated: false,
+  currentActivity: 'unknown',
+  slouchStartTime: null,
+  slouchAlertFired: false,
+  sitStartTime: null,
+  sessionStart: null,
+  counts: { good: 0, slouch: 0, walk: 0, stand: 0 },
+  signalBuffer: [], // circular buffer for signal chart
+  smaBuffer: [],    // SMA over time
+  filterState: [0, 0, 0], // Butterworth filter state
+  calSamples: [],
+  calCount: 0,
+  sessionLogs: []   // saved to localStorage
+};
+
+// ── Butterworth-like low-pass filter coefficients ─────────
+// 2nd-order Butterworth, 20Hz cutoff, 50Hz sampling (simplified IIR)
+const B = [0.0675, 0.1349, 0.0675];
+const A = [1, -1.1430, 0.4128];
+let fx = [0,0], fy = [0,0], fz = [0,0];
+
+function lowPass(val, mem, axis) {
+  // Direct Form II Transposed
+  const out = B[0]*val + mem[0];
+  mem[0] = B[1]*val - A[1]*out + mem[1];
+  mem[1] = B[2]*val - A[2]*out;
+  return out;
+}
+
+// ── Signal Magnitude Area (SMA) ───────────────────────────
+function computeSMA(ax, ay, az) {
+  return (Math.abs(ax) + Math.abs(ay) + Math.abs(az)) / 3;
+}
+
+// ── Gravity vector separation ─────────────────────────────
+function separateGravity(ax, ay, az) {
+  const ALPHA = 0.8;
+  state.filterState[0] = ALPHA * state.filterState[0] + (1 - ALPHA) * ax;
+  state.filterState[1] = ALPHA * state.filterState[1] + (1 - ALPHA) * ay;
+  state.filterState[2] = ALPHA * state.filterState[2] + (1 - ALPHA) * az;
+  return {
+    grav: [...state.filterState],
+    body: [ax - state.filterState[0], ay - state.filterState[1], az - state.filterState[2]]
+  };
+}
+
+// ── Sliding window buffer ─────────────────────────────────
+const WINDOW_SIZE = 128; // ~2.56s at 50Hz
+let windowBuf = [];
+
+function addToWindow(ax, ay, az) {
+  windowBuf.push({ ax, ay, az, t: Date.now() });
+  if (windowBuf.length > WINDOW_SIZE) windowBuf.shift();
+}
+
+// Feature extraction from window
+function extractFeatures() {
+  if (windowBuf.length < 20) return null;
+  const n = windowBuf.length;
+  let sumX = 0, sumY = 0, sumZ = 0;
+  let sumX2 = 0, sumY2 = 0, sumZ2 = 0;
+  let sma = 0;
+
+  for (let i = 0; i < n; i++) {
+    sumX += windowBuf[i].ax; sumY += windowBuf[i].ay; sumZ += windowBuf[i].az;
+    sumX2 += windowBuf[i].ax ** 2; sumY2 += windowBuf[i].ay ** 2; sumZ2 += windowBuf[i].az ** 2;
+    sma += Math.abs(windowBuf[i].ax) + Math.abs(windowBuf[i].ay) + Math.abs(windowBuf[i].az);
+  }
+
+  const meanX = sumX / n, meanY = sumY / n, meanZ = sumZ / n;
+  const stdX = Math.sqrt(sumX2/n - meanX**2);
+  const stdY = Math.sqrt(sumY2/n - meanY**2);
+  const stdZ = Math.sqrt(sumZ2/n - meanZ**2);
+  const smaVal = sma / (3 * n);
+
+  return { meanX, meanY, meanZ, stdX, stdY, stdZ, sma: smaVal };
+}
+
+// ── Activity Classification ───────────────────────────────
+// Rule-based classifier using gravity vector and SMA thresholds
+function classify(ax, ay, az) {
+  const { grav, body } = separateGravity(ax, ay, az);
+  const features = extractFeatures();
+  if (!features) return { label: 'calibrating', conf: 0 };
+
+  const { sma, stdX, stdY, stdZ } = features;
+  const totalStd = stdX + stdY + stdZ;
+
+  // Tilt angle from gravity vector
+  const gravMag = Math.sqrt(grav[0]**2 + grav[1]**2 + grav[2]**2);
+  const tiltY = Math.acos(Math.abs(grav[1]) / (gravMag || 1)) * 180 / Math.PI;
+
+  // Walking: high variability, significant body acceleration
+  if (sma > 1.4 || totalStd > 2.5) {
+    const conf = Math.min(99, 70 + (sma - 1.4) * 20);
+    return { label: 'walking', conf: Math.round(conf) };
+  }
+
+  // Determine if sitting or standing from gravity tilt
+  // Phone vertical (in pocket/hand) → standing; horizontal (on desk/lap) → sitting
+  const isLikelyHorizontal = Math.abs(grav[2]) > 7;
+  const isLikelyVertical = Math.abs(grav[1]) > 7;
+
+  if (isLikelyHorizontal || (!isLikelyVertical && sma < 0.5)) {
+    // Sitting — assess posture quality from tilt
+    const pitchAngle = Math.atan2(grav[0], Math.sqrt(grav[1]**2 + grav[2]**2)) * 180 / Math.PI;
+    const slouchIndicator = Math.abs(pitchAngle) > 20 || (totalStd > 0.8 && sma < 0.9);
+
+    if (slouchIndicator) {
+      return { label: 'slouch', conf: Math.round(Math.min(95, 75 + Math.abs(pitchAngle) * 0.5)) };
+    } else {
+      return { label: 'good', conf: Math.round(Math.min(95, 80 + (1 - sma) * 10)) };
+    }
+  }
+
+  // Standing
+  if (sma < 0.5 && totalStd < 1.2) {
+    return { label: 'stand', conf: Math.round(Math.min(92, 78 + (1 - totalStd) * 10)) };
+  }
+
+  return { label: 'good', conf: 70 };
+}
+
+// ── UI State updates ──────────────────────────────────────
+const ICONS = {
+  good: '🧑‍💻',
+  slouch: '🫤',
+  walking: '🚶',
+  stand: '🧍',
+  calibrating: '⏳'
+};
+const COLORS = {
+  good: 'var(--green)',
+  slouch: 'var(--amber)',
+  walking: 'var(--blue)',
+  stand: 'var(--text-dim)',
+  calibrating: 'var(--text-muted)'
+};
+const LABELS = {
+  good: 'Good Posture',
+  slouch: 'Slouching',
+  walking: 'Walking',
+  stand: 'Standing',
+  calibrating: 'Calibrating...'
+};
+
+function updatePostureUI(label, conf, ax, ay, az) {
+  document.getElementById('postureIcon').textContent = ICONS[label] || '🧍';
+  const stateEl = document.getElementById('postureState');
+  stateEl.textContent = LABELS[label] || label;
+  stateEl.style.color = COLORS[label] || 'var(--teal)';
+  document.getElementById('postureConf').textContent = conf ? `Confidence: ${conf}%` : 'Confidence: —';
+
+  // Update sensor display
+  document.getElementById('axVal').textContent = ax.toFixed(2);
+  document.getElementById('ayVal').textContent = ay.toFixed(2);
+  document.getElementById('azVal').textContent = az.toFixed(2);
+
+  // Gauge glow color
+  const gauge = document.getElementById('postureGauge');
+  gauge.style.setProperty('--state-color', (COLORS[label] || 'var(--teal)') + '12');
+}
+
+// ── Alert logic ───────────────────────────────────────────
+function handleAlerts(label) {
+  if (label === 'slouch') {
+    if (!state.slouchStartTime) {
+      state.slouchStartTime = Date.now();
+      state.slouchAlertFired = false;
+    }
+    const slouchDuration = (Date.now() - state.slouchStartTime) / 1000;
+    if (slouchDuration >= 60 && !state.slouchAlertFired && state.alertEnabled) {
+      triggerAlert('⚠️ Slouch detected for 60s — Fix your posture!');
+      state.slouchAlertFired = true;
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    }
+  } else {
+    state.slouchStartTime = null;
+    state.slouchAlertFired = false;
+  }
+}
+
+let alertTimeout;
+function triggerAlert(msg) {
+  const banner = document.getElementById('alertBanner');
+  banner.textContent = msg;
+  banner.classList.add('show');
+  clearTimeout(alertTimeout);
+  alertTimeout = setTimeout(() => banner.classList.remove('show'), 5000);
+}
+
+// ── Count tracking ────────────────────────────────────────
+let lastCountLabel = null;
+let lastCountTime = Date.now();
+
+function updateCounts(label) {
+  const now = Date.now();
+  if (lastCountLabel) {
+    const sec = (now - lastCountTime) / 1000;
+    if (lastCountLabel === 'good') state.counts.good += sec;
+    else if (lastCountLabel === 'slouch') state.counts.slouch += sec;
+    else if (lastCountLabel === 'walking') state.counts.walk += sec;
+    else if (lastCountLabel === 'stand') state.counts.stand += sec;
+  }
+  lastCountLabel = label;
+  lastCountTime = now;
+  refreshAnalytics();
+}
+
+function refreshAnalytics() {
+  const c = state.counts;
+  const total = c.good + c.slouch + c.walk + c.stand || 1;
+
+  const fmt = s => s < 60 ? `${Math.round(s)}s` : `${Math.round(s/60)}m`;
+  document.getElementById('goodTime').textContent = fmt(c.good);
+  document.getElementById('slouchTime').textContent = fmt(c.slouch);
+  document.getElementById('walkTime').textContent = fmt(c.walk);
+  document.getElementById('standTime').textContent = fmt(c.stand);
+
+  // Timeline bar
+  document.getElementById('barGood').style.width = (c.good/total*100) + '%';
+  document.getElementById('barSlouch').style.width = (c.slouch/total*100) + '%';
+  document.getElementById('barWalk').style.width = (c.walk/total*100) + '%';
+  document.getElementById('barStand').style.width = (c.stand/total*100) + '%';
+
+  // Score: 100 * (good + walk*0.8 + stand*0.6) / total
+  const score = Math.round(Math.min(100, ((c.good * 1.0 + c.walk * 0.8 + c.stand * 0.6) / total) * 100));
+  document.getElementById('scoreNum').textContent = score;
+  const arc = document.getElementById('scoreArc');
+  const circumference = 289;
+  arc.setAttribute('stroke-dashoffset', circumference - (score / 100) * circumference);
+  arc.setAttribute('stroke', score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--amber)' : 'var(--red)');
+
+  document.getElementById('scoreLabel').textContent =
+    score >= 80 ? '🌟 Excellent posture today!' :
+    score >= 60 ? '👍 Decent, keep it up!' :
+    score >= 40 ? '⚠️ Try to sit straighter' : '🔴 Needs attention';
+
+  // Donut chart
+  drawDonut(c, total);
+
+  // Top activity
+  const entries = [['🧑‍💻', c.good], ['😬', c.slouch], ['🚶', c.walk], ['🧍', c.stand]];
+  const top = entries.sort((a,b) => b[1]-a[1])[0];
+  const labels = ['good', 'slouch', 'walk', 'stand'];
+  const idx = entries.indexOf(top);
+  document.getElementById('topActivity').textContent = top[0];
+  document.getElementById('topActivityLabel').textContent = labels[idx] || '';
+}
+
+// ── Donut chart (canvas) ──────────────────────────────────
+function drawDonut(c, total) {
+  const canvas = document.getElementById('donutChart');
+  const ctx = canvas.getContext('2d');
+  const cx = 70, cy = 70, r = 52, inner = 35;
+  ctx.clearRect(0, 0, 140, 140);
+
+  const slices = [
+    { v: c.good, color: '#4ade80' },
+    { v: c.slouch, color: '#fbbf24' },
+    { v: c.walk, color: '#60a5fa' },
+    { v: c.stand, color: '#64748b' }
+  ];
+
+  let angle = -Math.PI / 2;
+  for (const s of slices) {
+    const sweep = (s.v / total) * 2 * Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, angle, angle + sweep);
+    ctx.closePath();
+    ctx.fillStyle = s.color;
+    ctx.fill();
+    angle += sweep;
+  }
+
+  // Inner hole
+  ctx.beginPath();
+  ctx.arc(cx, cy, inner, 0, Math.PI * 2);
+  ctx.fillStyle = '#111827';
+  ctx.fill();
+}
+
+// ── Signal chart (canvas) ─────────────────────────────────
+const MAX_SIGNAL_POINTS = 100;
+function updateSignalChart(ax, ay, az) {
+  state.signalBuffer.push({ ax, ay, az });
+  if (state.signalBuffer.length > MAX_SIGNAL_POINTS) state.signalBuffer.shift();
+  drawSignalChart();
+
+  const sma = computeSMA(ax, ay, az);
+  state.smaBuffer.push(sma);
+  if (state.smaBuffer.length > MAX_SIGNAL_POINTS) state.smaBuffer.shift();
+  drawSMAChart();
+}
+
+function drawLine(ctx, data, key, color, width, height) {
+  const n = data.length;
+  if (n < 2) return;
+  const minV = -20, maxV = 20;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const x = (i / (MAX_SIGNAL_POINTS - 1)) * width;
+    const y = height - ((data[i][key] - minV) / (maxV - minV)) * height;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+function drawSignalChart() {
+  const canvas = document.getElementById('signalChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.offsetWidth; const h = 80;
+  canvas.width = w; canvas.height = h;
+  ctx.clearRect(0, 0, w, h);
+
+  // Grid lines
+  ctx.strokeStyle = '#1e2d47'; ctx.lineWidth = 0.5;
+  for (let i = 1; i < 4; i++) {
+    const y = (i / 4) * h;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+
+  drawLine(ctx, state.signalBuffer, 'ax', '#f87171', w, h);
+  drawLine(ctx, state.signalBuffer, 'ay', '#4ade80', w, h);
+  drawLine(ctx, state.signalBuffer, 'az', '#60a5fa', w, h);
+}
+
+function drawSMAChart() {
+  const canvas = document.getElementById('smaChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.offsetWidth; const h = 90;
+  canvas.width = w; canvas.height = h;
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.strokeStyle = '#1e2d47'; ctx.lineWidth = 0.5;
+  for (let i = 1; i < 3; i++) {
+    const y = (i / 3) * h;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+
+  if (state.smaBuffer.length < 2) return;
+  const max = 5;
+  ctx.strokeStyle = 'var(--teal)';
+  ctx.lineWidth = 2;
+  ctx.shadowBlur = 6; ctx.shadowColor = '#00d4b860';
+  ctx.beginPath();
+  for (let i = 0; i < state.smaBuffer.length; i++) {
+    const x = (i / (MAX_SIGNAL_POINTS - 1)) * w;
+    const y = h - Math.min(state.smaBuffer[i] / max, 1) * h;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+// ── Feed log ──────────────────────────────────────────────
+let lastFeedLabel = null;
+let lastFeedTime = Date.now();
+
+function addFeed(label, conf) {
+  if (label === lastFeedLabel) return;
+  if (label === 'calibrating') return;
+  const now = Date.now();
+  const elapsed = now - lastFeedTime;
+  lastFeedLabel = label;
+  lastFeedTime = now;
+
+  const feed = document.getElementById('feedList');
+  const item = document.createElement('div');
+  item.className = 'feed-item';
+
+  const color = COLORS[label] || 'var(--teal)';
+  const timeStr = new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+
+  item.innerHTML = `
+    <div class="feed-dot" style="background:${color}"></div>
+    <div class="feed-text">${LABELS[label] || label} (${conf}% conf.)</div>
+    <div class="feed-time">${timeStr}</div>
+  `;
+
+  feed.insertBefore(item, feed.firstChild);
+  while (feed.children.length > 20) feed.removeChild(feed.lastChild);
+}
+
+// ── Main sensor handler ───────────────────────────────────
+let frameCount = 0;
+function handleMotion(ev) {
+  const acc = ev.accelerationIncludingGravity || ev.acceleration;
+  if (!acc) return;
+
+  let ax = acc.x || 0, ay = acc.y || 0, az = acc.z || 0;
+
+  // Apply Butterworth low-pass filter
+  const fax = lowPass(ax, fx, 'x');
+  const fay = lowPass(ay, fy, 'y');
+  const faz = lowPass(az, fz, 'z');
+
+  // Calibration: first 60 frames
+  if (state.calCount < 60) {
+    state.calSamples.push({ x: fax, y: fay, z: faz });
+    state.calCount++;
+    if (state.calCount === 60) {
+      const n = state.calSamples.length;
+      state.baseline.x = state.calSamples.reduce((s, v) => s + v.x, 0) / n;
+      state.baseline.y = state.calSamples.reduce((s, v) => s + v.y, 0) / n;
+      state.baseline.z = state.calSamples.reduce((s, v) => s + v.z, 0) / n;
+      state.calibrated = true;
+    }
+    updatePostureUI('calibrating', 0, fax, fay, faz);
+    return;
+  }
+
+  // Baseline-corrected body acceleration
+  const bax = fax - state.baseline.x;
+  const bay = fay - state.baseline.y;
+  const baz = faz - state.baseline.z;
+
+  addToWindow(bax, bay, baz);
+  frameCount++;
+
+  // Classify every 10 frames
+  if (frameCount % 10 === 0) {
+    const result = classify(bax, bay, baz);
+    const { label, conf } = result;
+    if (label !== 'calibrating') {
+      updatePostureUI(label, conf, fax, fay, faz);
+      handleAlerts(label);
+      updateCounts(label);
+      addFeed(label, conf);
+      state.currentActivity = label;
+    }
+  }
+
+  // Update signal chart every 5 frames
+  if (frameCount % 5 === 0) {
+    updateSignalChart(fax, fay, faz);
+  }
+}
+
+// ── Demo mode (desktop fallback) ─────────────────────────
+let demoT = 0;
+let demoPhase = 0;
+const demoPhases = [
+  { label: 'good', dur: 180 },
+  { label: 'slouch', dur: 120 },
+  { label: 'walking', dur: 90 },
+  { label: 'stand', dur: 60 },
+  { label: 'good', dur: 150 },
+];
+let demoPhaseIdx = 0, demoPhaseT = 0;
+
+function runDemoFrame() {
+  demoT++;
+  demoPhaseT++;
+
+  if (demoPhaseT > demoPhases[demoPhaseIdx].dur) {
+    demoPhaseIdx = (demoPhaseIdx + 1) % demoPhases.length;
+    demoPhaseT = 0;
+  }
+
+  const phase = demoPhases[demoPhaseIdx];
+  const label = phase.label;
+
+  // Simulate sensor values based on activity
+  let ax, ay, az;
+  const t = demoT * 0.1;
+  if (label === 'walking') {
+    ax = 0.5 * Math.sin(t * 2.5) + 0.2 * Math.random();
+    ay = 0.3 * Math.cos(t * 2.5) + (Math.random()-0.5)*0.4;
+    az = 9.5 + 0.6 * Math.sin(t * 2.3) + (Math.random()-0.5)*0.3;
+  } else if (label === 'slouch') {
+    ax = 3.5 + 0.1 * Math.random();
+    ay = 0.1 * Math.random();
+    az = 9.1 + 0.05 * Math.random();
+  } else if (label === 'stand') {
+    ax = 0.05 * Math.random();
+    ay = 0.05 * Math.random();
+    az = 9.8 + 0.04 * Math.random();
+  } else { // good sitting
+    ax = 0.1 + 0.03 * Math.random();
+    ay = 0.05 * Math.random();
+    az = 9.75 + 0.03 * Math.random();
+  }
+
+  const conf = 82 + Math.round(Math.random() * 12);
+
+  updatePostureUI(label, conf, ax, ay, az);
+  handleAlerts(label);
+  updateCounts(label);
+  addFeed(label, conf);
+  updateSignalChart(ax, ay, az);
+  state.currentActivity = label;
+}
+
+// ── Permission request ────────────────────────────────────
+async function requestPermission() {
+  document.getElementById('permCard').style.display = 'none';
+  document.getElementById('monitorContent').style.display = 'block';
+  document.getElementById('statusDot').classList.add('active');
+  state.monitoring = true;
+  state.sessionStart = Date.now();
+
+  // Try real sensors first
+  if (typeof DeviceMotionEvent !== 'undefined') {
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      // iOS 13+
+      try {
+        const perm = await DeviceMotionEvent.requestPermission();
+        if (perm === 'granted') {
+          window.addEventListener('devicemotion', handleMotion, { passive: true });
+          return;
+        }
+      } catch(e) {}
+    } else {
+      // Android / non-iOS
+      window.addEventListener('devicemotion', handleMotion, { passive: true });
+      // Test if we actually get data
+      let gotData = false;
+      const testListener = (ev) => {
+        if (ev.accelerationIncludingGravity && ev.accelerationIncludingGravity.x !== null) {
+          gotData = true;
+        }
+      };
+      window.addEventListener('devicemotion', testListener, { once: true });
+      setTimeout(() => {
+        if (!gotData) startDemoMode();
+      }, 800);
+      return;
+    }
+  }
+
+  startDemoMode();
+}
+
+function startDemoMode() {
+  triggerAlert('ℹ️ Demo mode — using simulated sensor data');
+  setInterval(runDemoFrame, 50); // ~20fps demo
+}
+
+function recalibrate() {
+  state.calSamples = [];
+  state.calCount = 0;
+  state.calibrated = false;
+  windowBuf = [];
+  fx = [0,0]; fy = [0,0]; fz = [0,0];
+  triggerAlert('🔄 Recalibrating — hold your device still for 3 seconds');
+}
+
+// ── Settings toggles ──────────────────────────────────────
+function toggleSetting(elId, key) {
+  state[key] = !state[key];
+  const el = document.getElementById(elId);
+  el.classList.toggle('on', state[key]);
+}
+
+// ── Tab switching ─────────────────────────────────────────
+function showTab(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+
+  if (id === 'analytics') {
+    setTimeout(() => { drawSignalChart(); drawSMAChart(); refreshAnalytics(); }, 50);
+  }
+  if (id === 'history') renderHistory();
+}
+
+// ── History persistence ───────────────────────────────────
+function saveSession() {
+  const s = state;
+  const entry = {
+    date: new Date().toLocaleString('en-IN'),
+    score: parseInt(document.getElementById('scoreNum').textContent) || 0,
+    counts: { ...s.counts },
+    duration: Math.round((Date.now() - s.sessionStart) / 60000)
+  };
+  const stored = JSON.parse(localStorage.getItem('postureiq_history') || '[]');
+  stored.unshift(entry);
+  localStorage.setItem('postureiq_history', JSON.stringify(stored.slice(0, 20)));
+}
+
+function renderHistory() {
+  const stored = JSON.parse(localStorage.getItem('postureiq_history') || '[]');
+  const el = document.getElementById('historyList');
+  if (!stored.length) {
+    el.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:40px 0; font-size:14px;">No sessions yet.<br>Start monitoring to record data.</div>';
+    return;
+  }
+  el.innerHTML = stored.map(entry => `
+    <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:10px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="font-size:13px; font-weight:600;">${entry.date}</div>
+        <div style="font-family:'Space Mono',monospace; color:${entry.score>=70?'var(--green)':entry.score>=40?'var(--amber)':'var(--red)'}; font-size:16px; font-weight:700;">${entry.score}/100</div>
+      </div>
+      <div style="font-size:12px; color:var(--text-muted);">Duration: ${entry.duration}m &nbsp;|&nbsp;
+        Good: ${Math.round(entry.counts.good)}s &nbsp;|&nbsp;
+        Slouch: ${Math.round(entry.counts.slouch)}s &nbsp;|&nbsp;
+        Walk: ${Math.round(entry.counts.walk)}s</div>
+    </div>
+  `).join('');
+}
+
+// Save session every 2 minutes
+setInterval(() => { if (state.monitoring) saveSession(); }, 120000);
+window.addEventListener('beforeunload', () => { if (state.monitoring) saveSession(); });
+
+// Initialize analytics charts on load
+setTimeout(refreshAnalytics, 200);
+</script>
+</body>
+</html>
